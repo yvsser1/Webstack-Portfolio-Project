@@ -17,3 +17,5 @@ export interface Profile {
   is_admin: boolean;
   created_at: string;
 }
+
+export type BookingStatus = 'pending' | 'approved' | 'rejected' | 'cancelled';

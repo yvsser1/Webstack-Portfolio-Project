@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { format } from 'date-fns';
+import { BookingStatus } from '../../types';
+import { BookingStatusBadge } from '../ui/BookingStatusBadge';
 
 interface Booking {
   id: string;
@@ -14,7 +16,7 @@ interface Booking {
   start_date: string;
   end_date: string;
   total_price: number;
-  status: string;
+  status: BookingStatus;
 }
 
 export function BookingsList() {
@@ -34,14 +36,29 @@ export function BookingsList() {
         total_price,
         status,
         car:cars(make, model),
-        user:profiles(email)
+        user_id
       `)
       .order('created_at', { ascending: false });
     
-    if (data) setBookings(data);
+    if (data) {
+      // Fetch user emails from auth.users table
+      const userIds = [...new Set(data.map(booking => booking.user_id))];
+      const { data: users } = await supabase.auth.admin.listUsers({
+        userIds
+      });
+
+      const bookingsWithUserData = data.map(booking => ({
+        ...booking,
+        user: {
+          email: users?.users.find(u => u.id === booking.user_id)?.email || 'Unknown'
+        }
+      }));
+
+      setBookings(bookingsWithUserData);
+    }
   };
 
-  const handleStatusUpdate = async (id: string, status: string) => {
+  const handleStatusUpdate = async (id: string, status: BookingStatus) => {
     const { error } = await supabase
       .from('bookings')
       .update({ status })
@@ -100,15 +117,7 @@ export function BookingsList() {
                 </div>
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
-                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                  booking.status === 'approved'
-                    ? 'bg-green-100 text-green-800'
-                    : booking.status === 'pending'
-                    ? 'bg-yellow-100 text-yellow-800'
-                    : 'bg-red-100 text-red-800'
-                }`}>
-                  {booking.status}
-                </span>
+                <BookingStatusBadge status={booking.status} />
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                 {booking.status === 'pending' && (
